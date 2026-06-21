@@ -462,7 +462,7 @@ function WebsiteManager({ websites, databases, run }: { websites: Website[]; dat
                   <Shield size={15} style={{ color: site.ssl ? "#18a999" : "#8e9bb0" }} />
                 </button>
 
-                <button title="Open website" onClick={() => run("Open browser", () => invoke("open_url", { url: `http://localhost/${urlName}/` }))}><Eye size={15} /></button>
+                <button title="Open website" onClick={() => run("Open browser", () => invoke("open_url", { url: `${site.ssl ? 'https' : 'http'}://${site.domain}/` }))}><Eye size={15} /></button>
                 <button title="Open folder" onClick={() => run("Open folder", () => invoke("open_path", { path: site.root }))}>Folder</button>
                 <button title="Edit in VS Code" onClick={() => run("Open VS Code", () => invoke("open_vscode", { path: site.root }))}><Edit3 size={15} /></button>
                 <button title="Download ZIP" onClick={() => run("Download website", () => invoke("download_website", { request: { domain: site.domain, database: downloadDb || null } }))}><Download size={15} /></button>

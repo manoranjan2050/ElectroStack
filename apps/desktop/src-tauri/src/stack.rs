@@ -78,8 +78,33 @@ pub fn create_website(domain: &str, php_version: Option<String>, ssl: bool) -> R
             ),
         )?;
     }
+    
+    // Generate certificate if SSL is enabled
+    if ssl {
+        generate_certificate(domain)?;
+    }
+
     let php_version = php_version.unwrap_or_else(|| "8.3".to_string());
     write_nginx_vhost(domain, &root, &php_version, ssl)?;
+    
+    // Run add-host.ps1 with elevated privileges to map domain to 127.0.0.1 in hosts file
+    let add_host_script = config::stack_root().join("scripts/add-host.ps1");
+    if add_host_script.exists() {
+        let _ = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &format!(
+                    "Start-Process PowerShell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{}\" -Domain {}'",
+                    add_host_script.display(),
+                    domain
+                ),
+            ])
+            .status();
+    }
+
     let mut websites = websites()?;
     websites.retain(|site| site.domain != domain);
     let site = Website {
@@ -91,6 +116,12 @@ pub fn create_website(domain: &str, php_version: Option<String>, ssl: bool) -> R
     };
     websites.push(site.clone());
     write_json(config::config_file("websites.json"), &websites)?;
+    
+    // Restart Nginx to load the new config
+    let _ = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", &config::stack_root().join("scripts/restart-nginx.ps1").to_string_lossy()])
+        .status();
+
     Ok(site)
 }
 
@@ -877,6 +908,20 @@ pub async fn install_app_template(domain: &str, template: &str) -> Result<String
             
             let db_name = domain.replace('.', "_");
             let _ = mysql(&["-e", &format!("CREATE DATABASE IF NOT EXISTS `{db_name}`;")]).await;
+
+            // Auto-configure wp-config.php with MariaDB credentials
+            let sample_config = site_root.join("wp-config-sample.php");
+            let config_path = site_root.join("wp-config.php");
+            if sample_config.exists() && !config_path.exists() {
+                if let Ok(content) = fs::read_to_string(&sample_config) {
+                    let configured = content
+                        .replace("database_name_here", &db_name)
+                        .replace("username_here", "root")
+                        .replace("password_here", "")
+                        .replace("localhost", "127.0.0.1");
+                    let _ = fs::write(&config_path, configured);
+                }
+            }
         }
         "laravel" => {
             let output = tokio::process::Command::new("composer.bat")
