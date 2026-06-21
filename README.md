@@ -89,12 +89,15 @@ graph TD
 - [x] Fast, secure API REST bridge with bearer authentication.
 - [x] Auto-login phpMyAdmin config authentication.
 - [x] Direct PowerShell launcher for layout repairs.
-- [ ] Single-click root certificate system trust mapping.
-- [ ] Isolated multi-pool PHP-FPM execution.
-- [ ] Mailpit SMTP server bundling.
-- [ ] WordPress, Laravel, and React project installers.
-- [ ] Ngrok local tunnel dashboard widget.
-- [ ] Taskbar tray quick actions context menu.
+- [x] Single-click root certificate system trust mapping.
+- [x] Isolated multi-pool PHP-FPM execution.
+- [x] Mailpit SMTP server bundling.
+- [x] WordPress, Laravel, and React project installers (with auto-config).
+- [x] Local tunnel dashboard sharing widget.
+- [x] Taskbar tray quick actions context menu with website shortcuts.
+- [ ] Visual telemetry graphs showing CPU, RAM, and disk utilization history.
+- [ ] Docker container orchestration dashboard controls.
+- [ ] One-click remote server git deployment engine.
 
 ---
 
