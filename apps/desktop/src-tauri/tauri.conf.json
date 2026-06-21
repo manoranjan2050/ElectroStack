@@ -1,0 +1,74 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ElectroStack",
+  "version": "0.1.0",
+  "identifier": "dev.electrostack.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ElectroStack",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1040,
+        "minHeight": 680,
+        "resizable": true
+      },
+      {
+        "label": "tray-panel",
+        "title": "ElectroStack Controls",
+        "url": "tray.html",
+        "width": 380,
+        "height": 620,
+        "minWidth": 340,
+        "minHeight": 520,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "publisher": "ElectroStack",
+    "category": "DeveloperTool",
+    "shortDescription": "Modern local web development server",
+    "longDescription": "ElectroStack manages a local Nginx, PHP, MariaDB, Redis, Node.js, Composer, Git, FTP, Docker, SSL, and backup workflow for Windows.",
+    "resources": [
+      "../../../scripts/*"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": true,
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perMachine",
+        "languages": ["English"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/electrostack/electrostack/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@electrostack/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "echo UI package is style-only",
+    "typecheck": "echo UI package is style-only"
+  }
+}

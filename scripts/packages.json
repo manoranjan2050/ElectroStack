@@ -1,0 +1,44 @@
+{
+  "nginx": {
+    "version": "1.27.3",
+    "url": "https://nginx.org/download/nginx-1.27.3.zip",
+    "sha256": "",
+    "destination": "nginx"
+  },
+  "php-8.1": {
+    "version": "8.1",
+    "url": "https://windows.php.net/downloads/releases/php-8.1.31-nts-Win32-vs16-x64.zip",
+    "sha256": "",
+    "destination": "php\\8.1"
+  },
+  "php-8.2": {
+    "version": "8.2",
+    "url": "https://windows.php.net/downloads/releases/php-8.2.27-nts-Win32-vs16-x64.zip",
+    "sha256": "",
+    "destination": "php\\8.2"
+  },
+  "php-8.3": {
+    "version": "8.3",
+    "url": "https://windows.php.net/downloads/releases/php-8.3.15-nts-Win32-vs16-x64.zip",
+    "sha256": "",
+    "destination": "php\\8.3"
+  },
+  "php-8.4": {
+    "version": "8.4",
+    "url": "https://windows.php.net/downloads/releases/php-8.4.2-nts-Win32-vs17-x64.zip",
+    "sha256": "",
+    "destination": "php\\8.4"
+  },
+  "composer": {
+    "version": "latest",
+    "url": "https://getcomposer.org/download/latest-stable/composer.phar",
+    "sha256": "",
+    "destination": "composer"
+  },
+  "phpmyadmin": {
+    "version": "5.2.1",
+    "url": "https://files.phpmyadmin.net/phpMyAdmin/5.2.1/phpMyAdmin-5.2.1-all-languages.zip",
+    "sha256": "",
+    "destination": "phpmyadmin"
+  }
+}

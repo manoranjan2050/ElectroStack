@@ -1,0 +1,37 @@
+[package]
+name = "electrostack"
+version = "0.1.0"
+description = "ElectroStack desktop control panel"
+authors = ["ElectroStack Contributors"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "electrostack_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5.0"
+once_cell = "1.19"
+regex = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+sysinfo = "0.30"
+tauri = { version = "2.0.0", features = ["tray-icon", "image-png"] }
+tauri-plugin-autostart = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-opener = "2.0.0"
+tauri-plugin-store = "2.0.0"
+tokio = { version = "1.38", features = ["process", "rt-multi-thread", "macros"] }
+which = "6.0"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

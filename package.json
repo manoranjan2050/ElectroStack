@@ -1,0 +1,33 @@
+{
+  "name": "electrostack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modern local web development server for Windows.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "tauri:dev": "npm --workspace apps/desktop run tauri:dev",
+    "tauri:build": "npm --workspace apps/desktop run tauri:build",
+    "lint": "npm --workspaces run lint",
+    "typecheck": "npm --workspaces run typecheck",
+    "format": "prettier --write .",
+    "install:stack": "powershell -ExecutionPolicy Bypass -File scripts/install-stack.ps1",
+    "verify:stack": "powershell -ExecutionPolicy Bypass -File scripts/verify-stack.ps1"
+  },
+  "workspaces": [
+    "apps/desktop",
+    "packages/core",
+    "packages/ui"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "prettier": "^3.3.2",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

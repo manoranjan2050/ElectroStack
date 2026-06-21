@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+src-tauri/target/
+.turbo/
+.vite/
+*.log
+.env
+.env.*
+packages-cache/
+ElectroStackSetup.exe
+C_ElectroStack/
