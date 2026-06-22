@@ -506,6 +506,114 @@ pub async fn docker_control(id: &str, action: &str) -> Result<String> {
     }
 }
 
+pub async fn get_docker_images() -> Result<Vec<crate::models::DockerImage>> {
+    let output = run("docker", ["images", "--format", "{{json .}}"]).await?;
+    let mut images = vec![];
+    for line in output.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(line)?;
+        images.push(crate::models::DockerImage {
+            repository: value["Repository"].as_str().unwrap_or_default().to_string(),
+            tag: value["Tag"].as_str().unwrap_or_default().to_string(),
+            id: value["ID"].as_str().unwrap_or_default().to_string(),
+            size: value["Size"].as_str().unwrap_or_default().to_string(),
+        });
+    }
+    Ok(images)
+}
+
+pub async fn run_docker_container(image: &str, name: Option<String>, port_mapping: Option<String>) -> Result<String> {
+    let mut args = vec!["run".to_string(), "-d".to_string()];
+    if let Some(n) = name.filter(|n| !n.trim().is_empty()) {
+        args.push("--name".to_string());
+        args.push(n);
+    }
+    if let Some(p) = port_mapping.filter(|p| !p.trim().is_empty()) {
+        args.push("-p".to_string());
+        args.push(p);
+    }
+    args.push(image.to_string());
+    run("docker", args).await
+}
+
+pub async fn pull_docker_image(image: &str) -> Result<String> {
+    run("docker", ["pull", image]).await
+}
+
+pub async fn prune_docker_system() -> Result<String> {
+    run("docker", ["system", "prune", "-f"]).await
+}
+
+pub async fn run_ssh_deployment(req: crate::models::SshDeploymentRequest) -> Result<String> {
+    let temp_dir = config::stack_root().join("temp");
+    fs::create_dir_all(&temp_dir)?;
+    let key_path = temp_dir.join("deploy_id_rsa");
+    
+    // Write key
+    fs::write(&key_path, &req.key_content)?;
+
+    // Set ACL permissions on Windows so ssh doesn't complain about "unprotected private key file"
+    let key_path_str = key_path.to_string_lossy().to_string();
+    let ps_script = format!(
+        r#"$path = '{}'
+        $acl = Get-Acl $path
+        $acl.SetAccessRuleProtection($true, $false)
+        $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($currentUser, 'FullControl', 'Allow')
+        $acl.SetAccessRule($rule)
+        Set-Acl $path $acl"#,
+        key_path_str
+    );
+
+    let status = tokio::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &ps_script,
+        ])
+        .status()
+        .await?;
+
+    if !status.success() {
+        let _ = fs::remove_file(&key_path);
+        return Err(anyhow!("Failed to set SSH key permissions."));
+    }
+
+    let joined_commands = req.commands.join(" && ");
+    let host_arg = format!("{}@{}", req.user, req.host);
+    let port_str = req.port.to_string();
+
+    let output = tokio::process::Command::new("ssh")
+        .args([
+            "-i",
+            &key_path_str,
+            "-p",
+            &port_str,
+            "-o",
+            "StrictHostKeyChecking=no",
+            &host_arg,
+            &joined_commands,
+        ])
+        .output()
+        .await?;
+
+    // Cleanup key immediately
+    let _ = fs::remove_file(&key_path);
+
+    let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if output.status.success() {
+        Ok(format!("Deployment successful!\n\nSTDOUT:\n{stdout_str}\n\nSTDERR:\n{stderr_str}"))
+    } else {
+        Err(anyhow!("Deployment failed.\n\nSTDOUT:\n{stdout_str}\n\nSTDERR:\n{stderr_str}"))
+    }
+}
+
 pub async fn node_versions() -> Result<Vec<String>> {
     let mut versions = vec![];
     if which::which("node").is_ok() {

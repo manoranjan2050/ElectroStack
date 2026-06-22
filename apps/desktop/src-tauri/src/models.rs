@@ -136,3 +136,22 @@ pub struct FtpUser {
     pub website: String,
     pub permissions: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerImage {
+    pub repository: String,
+    pub tag: String,
+    pub id: String,
+    pub size: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshDeploymentRequest {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub key_content: String,
+    pub commands: Vec<String>,
+}

@@ -302,6 +302,31 @@ pub fn get_active_php_version() -> CommandResult<String> {
     stack::get_active_php_version().map_err(to_string)
 }
 
+#[tauri::command]
+pub async fn get_docker_images() -> CommandResult<Vec<crate::models::DockerImage>> {
+    stack::get_docker_images().await.map_err(to_string)
+}
+
+#[tauri::command]
+pub async fn run_docker_container(image: String, name: Option<String>, port_mapping: Option<String>) -> CommandResult<String> {
+    stack::run_docker_container(&image, name, port_mapping).await.map_err(to_string)
+}
+
+#[tauri::command]
+pub async fn pull_docker_image(image: String) -> CommandResult<String> {
+    stack::pull_docker_image(&image).await.map_err(to_string)
+}
+
+#[tauri::command]
+pub async fn prune_docker_system() -> CommandResult<String> {
+    stack::prune_docker_system().await.map_err(to_string)
+}
+
+#[tauri::command]
+pub async fn run_ssh_deployment(req: crate::models::SshDeploymentRequest) -> CommandResult<String> {
+    stack::run_ssh_deployment(req).await.map_err(to_string)
+}
+
 fn to_string(error: impl std::fmt::Display) -> String {
     error.to_string()
 }

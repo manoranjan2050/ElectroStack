@@ -92,6 +92,7 @@ const nav = [
   ["Composer", Boxes],
   ["Node.js", Workflow],
   ["Git", FolderGit2],
+  ["Remote Deploy", Network],
   ["Settings", Settings]
 ] as const;
 
@@ -105,6 +106,11 @@ function App() {
   const [authReady, setAuthReady] = React.useState(false);
   const [adminConfigured, setAdminConfigured] = React.useState(false);
   const [authenticated, setAuthenticated] = React.useState(false);
+  const [telemetryHistory, setTelemetryHistory] = React.useState<{ cpu: number[]; ram: number[]; disk: number[] }>({
+    cpu: [],
+    ram: [],
+    disk: []
+  });
 
   const refresh = React.useCallback(async () => {
     const [overviewData, websiteData, databaseData] = await Promise.all([
@@ -115,6 +121,13 @@ function App() {
     setOverview(overviewData);
     setWebsites(websiteData);
     setDatabases(databaseData);
+    
+    setTelemetryHistory((prev) => {
+      const cpu = [...prev.cpu, overviewData.cpuUsage].slice(-20);
+      const ram = [...prev.ram, overviewData.ramUsage].slice(-20);
+      const disk = [...prev.disk, overviewData.diskUsage].slice(-20);
+      return { cpu, ram, disk };
+    });
   }, []);
 
   React.useEffect(() => {
@@ -226,7 +239,7 @@ function App() {
             </div>
           </div>
 
-          {active === "Dashboard" && <Dashboard overview={overview} run={run} />}
+          {active === "Dashboard" && <Dashboard overview={overview} telemetryHistory={telemetryHistory} run={run} />}
           {active === "Websites" && <WebsiteManager websites={websites} databases={databases} run={run} />}
           {active === "Databases" && <DatabaseManager databases={databases} run={run} />}
           {active === "PHP Versions" && <PhpManager run={run} />}
@@ -241,6 +254,7 @@ function App() {
           {active === "Composer" && <ComposerManager websites={websites} run={run} />}
           {active === "Node.js" && <NodeManager websites={websites} run={run} />}
           {active === "Git" && <GitManager websites={websites} run={run} />}
+          {active === "Remote Deploy" && <DeploymentManager run={run} />}
           {active === "Settings" && <SettingsView run={run} />}
         </section>
 
@@ -297,18 +311,97 @@ function LoginScreen({ configured, onDone }: { configured: boolean; onDone: () =
   );
 }
 
-function Dashboard({ overview, run }: { overview: Overview | null; run: <T>(label: string, action: () => Promise<T>) => Promise<void> }) {
+function TelemetryGraph({ data, color }: { data: number[]; color: string }) {
+  const width = 300;
+  const height = 80;
+  const maxVal = 100;
+  
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#8e9bb0' }}>
+        No telemetry history...
+      </div>
+    );
+  }
+  
+  const points = data
+    .map((val, index) => {
+      const x = data.length > 1 ? (index / (data.length - 1)) * width : width;
+      const y = height - (val / maxVal) * height;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const areaPoints = data.length > 0 
+    ? `0,${height} ${points} ${width},${height}`
+    : "";
+
+  const gradId = `grad-${color.replace(/[^\w]/g, '')}`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ overflow: 'visible', marginTop: '10px' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {areaPoints && <polygon points={areaPoints} fill={`url(#${gradId})`} />}
+      <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="rgba(132, 145, 166, 0.08)" strokeDasharray="2 2" />
+      <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="rgba(132, 145, 166, 0.08)" strokeDasharray="2 2" />
+      <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="rgba(132, 145, 166, 0.08)" strokeDasharray="2 2" />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        points={points}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {data.length > 0 && (
+        <circle
+          cx={(data.length - 1) * (width / Math.max(1, data.length - 1))}
+          cy={height - (data[data.length - 1] / maxVal) * height}
+          r="3.5"
+          fill={color}
+          stroke="var(--es-ink, #0c201d)"
+          strokeWidth="1.5"
+        />
+      )}
+    </svg>
+  );
+}
+
+function Metric({ title, value, history, color, icon: Icon }: { title: string; value: number; history: number[]; color: string; icon: typeof Activity }) {
+  return (
+    <div className="metric" style={{ height: "auto", minHeight: "170px", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+        <Icon size={20} />
+        <span>{title}</span>
+        <strong style={{ marginLeft: "auto" }}>{Math.round(value)}%</strong>
+      </div>
+      <div className="bar" style={{ margin: "8px 0" }}><i style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <TelemetryGraph data={history} color={color} />
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ overview, telemetryHistory, run }: { overview: Overview | null; telemetryHistory: { cpu: number[]; ram: number[]; disk: number[] }; run: <T>(label: string, action: () => Promise<T>) => Promise<void> }) {
   const services = overview?.services ?? [];
   return (
     <>
       <div className="metrics">
-        <Metric title="CPU Usage" value={overview?.cpuUsage ?? 0} icon={Activity} />
-        <Metric title="RAM Usage" value={overview?.ramUsage ?? 0} icon={Server} />
-        <Metric title="Disk Usage" value={overview?.diskUsage ?? 0} icon={HardDrive} />
-        <div className="metric">
-          <Network size={20} />
-          <span>Running Services</span>
-          <strong>{overview?.runningServices ?? 0}</strong>
+        <Metric title="CPU Usage" value={overview?.cpuUsage ?? 0} history={telemetryHistory.cpu} color="var(--es-teal)" icon={Activity} />
+        <Metric title="RAM Usage" value={overview?.ramUsage ?? 0} history={telemetryHistory.ram} color="#3b82f6" icon={Server} />
+        <Metric title="Disk Usage" value={overview?.diskUsage ?? 0} history={telemetryHistory.disk} color="#f5b141" icon={HardDrive} />
+        <div className="metric" style={{ height: "auto", minHeight: "170px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Network size={20} />
+            <span>Running Services</span>
+          </div>
+          <strong style={{ fontSize: "2rem", marginTop: "1rem" }}>{overview?.runningServices ?? 0}</strong>
         </div>
       </div>
       <div className="grid two">
@@ -347,17 +440,6 @@ function Dashboard({ overview, run }: { overview: Overview | null; run: <T>(labe
         </section>
       </div>
     </>
-  );
-}
-
-function Metric({ title, value, icon: Icon }: { title: string; value: number; icon: typeof Activity }) {
-  return (
-    <div className="metric">
-      <Icon size={20} />
-      <span>{title}</span>
-      <strong>{Math.round(value)}%</strong>
-      <div className="bar"><i style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
-    </div>
   );
 }
 
@@ -779,11 +861,27 @@ type DockerContainerInfo = {
   status: string;
 };
 
+type DockerImageInfo = {
+  repository: string;
+  tag: string;
+  id: string;
+  size: string;
+};
+
 function DockerManager({ run }: { run: <T>(label: string, action: () => Promise<T>) => Promise<void> }) {
   const [containers, setContainers] = React.useState<DockerContainerInfo[]>([]);
+  const [images, setImages] = React.useState<DockerImageInfo[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedLogs, setSelectedLogs] = React.useState<string | null>(null);
   const [logContent, setLogContent] = React.useState("");
+
+  const [dockerTab, setDockerTab] = React.useState<"containers" | "images">("containers");
+  const [pullImageName, setPullImageName] = React.useState("");
+  
+  // Container creation form state
+  const [runImageName, setRunImageName] = React.useState("");
+  const [runContainerName, setRunContainerName] = React.useState("");
+  const [runPortMapping, setRunPortMapping] = React.useState("");
 
   const refreshContainers = React.useCallback(() => {
     setLoading(true);
@@ -798,9 +896,16 @@ function DockerManager({ run }: { run: <T>(label: string, action: () => Promise<
       });
   }, []);
 
+  const refreshImages = React.useCallback(() => {
+    invoke<DockerImageInfo[]>("get_docker_images")
+      .then(setImages)
+      .catch(() => setImages([]));
+  }, []);
+
   React.useEffect(() => {
     refreshContainers();
-  }, [refreshContainers]);
+    refreshImages();
+  }, [refreshContainers, refreshImages]);
 
   async function showLogs(id: string) {
     setSelectedLogs(id);
@@ -813,35 +918,146 @@ function DockerManager({ run }: { run: <T>(label: string, action: () => Promise<
     }
   }
 
+  async function handlePullImage() {
+    if (!pullImageName.trim()) return;
+    await run(`Pulling image ${pullImageName}`, async () => {
+      await invoke("pull_docker_image", { image: pullImageName });
+      refreshImages();
+    });
+    setPullImageName("");
+  }
+
+  async function handleRunContainer() {
+    if (!runImageName.trim()) return;
+    await run(`Running container from ${runImageName}`, async () => {
+      await invoke("run_docker_container", {
+        image: runImageName,
+        name: runContainerName || null,
+        portMapping: runPortMapping || null
+      });
+      refreshContainers();
+    });
+    setRunContainerName("");
+    setRunPortMapping("");
+  }
+
+  async function handlePruneDocker() {
+    if (!window.confirm("Are you sure you want to prune the Docker system? This will remove all stopped containers and unused images.")) return;
+    await run("Pruning Docker system", async () => {
+      const result = await invoke<string>("prune_docker_system");
+      alert(result || "Docker system pruned successfully.");
+      refreshContainers();
+      refreshImages();
+    });
+  }
+
   return (
     <div className="stackedForm">
-      <div className="panel">
-        <div className="pageTitle" style={{ padding: 0, marginBottom: "1rem" }}>
-          <h2>Docker Containers</h2>
-          <button onClick={refreshContainers}><RefreshCw size={15} /> Refresh</button>
-        </div>
-
-        {loading ? (
-          <p>Loading Docker containers...</p>
-        ) : containers.length === 0 ? (
-          <p className="muted">No Docker containers found (or Docker is not running).</p>
-        ) : (
-          <div className="table">
-            {containers.map((c) => (
-              <div className="tableRow" key={c.id} style={{ gridTemplateColumns: "1fr 1.5fr 1fr 1.5fr" }}>
-                <strong>{c.name}</strong>
-                <span className="muted" style={{ fontSize: "12px" }}>{c.image}</span>
-                <span className={clsx("badge", c.status.toLowerCase().includes("up") ? "running" : "stopped")}>{c.status}</span>
-                <div style={{ display: "flex", gap: "5px" }}>
-                  <button title="Start" onClick={() => run(`Start ${c.name}`, () => invoke("control_docker_container", { id: c.id, action: "start" }))}><Play size={13} /></button>
-                  <button title="Stop" onClick={() => run(`Stop ${c.name}`, () => invoke("control_docker_container", { id: c.id, action: "stop" }))}><Square size={13} /></button>
-                  <button title="Logs" onClick={() => showLogs(c.id)}><Terminal size={13} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="tabHeader">
+        <button className={clsx(dockerTab === "containers" && "active")} onClick={() => setDockerTab("containers")}>Containers</button>
+        <button className={clsx(dockerTab === "images" && "active")} onClick={() => setDockerTab("images")}>Images & Orchestration</button>
       </div>
+
+      {dockerTab === "containers" && (
+        <div className="panel" style={{ marginTop: "1rem" }}>
+          <div className="pageTitle" style={{ padding: 0, marginBottom: "1rem" }}>
+            <h2>Docker Containers</h2>
+            <button onClick={refreshContainers}><RefreshCw size={15} /> Refresh</button>
+          </div>
+
+          {loading ? (
+            <p>Loading Docker containers...</p>
+          ) : containers.length === 0 ? (
+            <p className="muted">No Docker containers found (or Docker is not running).</p>
+          ) : (
+            <div className="table">
+              {containers.map((c) => (
+                <div className="tableRow" key={c.id} style={{ gridTemplateColumns: "1fr 1.5fr 1fr 1.5fr" }}>
+                  <strong>{c.name}</strong>
+                  <span className="muted" style={{ fontSize: "12px" }}>{c.image}</span>
+                  <span className={clsx("badge", c.status.toLowerCase().includes("up") ? "running" : "stopped")}>{c.status}</span>
+                  <div style={{ display: "flex", gap: "5px" }}>
+                    <button title="Start" onClick={() => run(`Start ${c.name}`, () => invoke("control_docker_container", { id: c.id, action: "start" }))}><Play size={13} /></button>
+                    <button title="Stop" onClick={() => run(`Stop ${c.name}`, () => invoke("control_docker_container", { id: c.id, action: "stop" }))}><Square size={13} /></button>
+                    <button title="Logs" onClick={() => showLogs(c.id)}><Terminal size={13} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {dockerTab === "images" && (
+        <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="grid two">
+            <section className="panel stackedForm">
+              <h2>Pull Docker Image</h2>
+              <div className="formRow compact">
+                <input 
+                  placeholder="e.g. nginx:latest, mysql:8.0, alpine" 
+                  value={pullImageName} 
+                  onChange={(e) => setPullImageName(e.target.value)} 
+                />
+                <button className="primary" onClick={handlePullImage}>Pull Image</button>
+              </div>
+
+              <h2 style={{ marginTop: "20px" }}>Run Container</h2>
+              <div className="formRow compact">
+                <select value={runImageName} onChange={(e) => setRunImageName(e.target.value)}>
+                  <option value="">Select an image</option>
+                  {images.map(img => (
+                    <option key={`${img.repository}:${img.tag}`} value={`${img.repository}:${img.tag}`}>
+                      {img.repository}:{img.tag}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="formRow" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <label>Container Name
+                  <input 
+                    placeholder="my-app-nginx" 
+                    value={runContainerName} 
+                    onChange={(e) => setRunContainerName(e.target.value)} 
+                  />
+                </label>
+                <label>Port mapping
+                  <input 
+                    placeholder="8080:80" 
+                    value={runPortMapping} 
+                    onChange={(e) => setRunPortMapping(e.target.value)} 
+                  />
+                </label>
+              </div>
+              <button className="primary" onClick={handleRunContainer} disabled={!runImageName}>
+                <Play size={15} /> Run Container
+              </button>
+            </section>
+
+            <section className="panel stackedForm">
+              <div className="pageTitle" style={{ padding: 0, marginBottom: "1rem" }}>
+                <h2>Local Images</h2>
+                <button className="primary" style={{ background: "rgba(242,94,94,0.15)", color: "#ff7777" }} onClick={handlePruneDocker}>
+                  <Trash2 size={13} /> Prune Unused
+                </button>
+              </div>
+              {images.length === 0 ? (
+                <p className="muted">No local Docker images found.</p>
+              ) : (
+                <div className="table" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                  {images.map((img, idx) => (
+                    <div className="tableRow" key={idx} style={{ gridTemplateColumns: "1.5fr 1fr 1fr", fontSize: "12px", padding: "8px 5px" }}>
+                      <strong>{img.repository}:{img.tag}</strong>
+                      <span className="muted" style={{ fontFamily: "monospace" }}>{img.id.substring(0, 12)}</span>
+                      <span style={{ textAlign: "right" }}>{img.size}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
 
       {selectedLogs && (
         <section className="panel">
@@ -854,6 +1070,207 @@ function DockerManager({ run }: { run: <T>(label: string, action: () => Promise<
           </pre>
         </section>
       )}
+    </div>
+  );
+}
+
+function DeploymentManager({ run }: { run: <T>(label: string, action: () => Promise<T>) => Promise<void> }) {
+  const [host, setHost] = React.useState("");
+  const [port, setPort] = React.useState(22);
+  const [user, setUser] = React.useState("root");
+  const [keyContent, setKeyContent] = React.useState("");
+  const [commands, setCommands] = React.useState<string[]>([
+    "cd /var/www/html",
+    "git pull",
+    "composer install --no-dev",
+    "npm install",
+    "npm run build"
+  ]);
+  const [newCommand, setNewCommand] = React.useState("");
+  const [consoleOut, setConsoleOut] = React.useState("");
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem("es_deploy_config");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setHost(parsed.host || "");
+        setPort(parsed.port || 22);
+        setUser(parsed.user || "root");
+        setKeyContent(parsed.keyContent || "");
+        if (parsed.commands) setCommands(parsed.commands);
+      } catch (e) {
+        console.error("Failed to load deployment config", e);
+      }
+    }
+  }, []);
+
+  const saveConfig = (updatedHost: string, updatedPort: number, updatedUser: string, updatedKey: string, updatedCmds: string[]) => {
+    localStorage.setItem("es_deploy_config", JSON.stringify({
+      host: updatedHost,
+      port: updatedPort,
+      user: updatedUser,
+      keyContent: updatedKey,
+      commands: updatedCmds
+    }));
+  };
+
+  const addCommand = () => {
+    if (!newCommand.trim()) return;
+    const updated = [...commands, newCommand.trim()];
+    setCommands(updated);
+    setNewCommand("");
+    saveConfig(host, port, user, keyContent, updated);
+  };
+
+  const removeCommand = (index: number) => {
+    const updated = commands.filter((_, idx) => idx !== index);
+    setCommands(updated);
+    saveConfig(host, port, user, keyContent, updated);
+  };
+
+  const moveCommand = (index: number, direction: "up" | "down") => {
+    if (direction === "up" && index === 0) return;
+    if (direction === "down" && index === commands.length - 1) return;
+    
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    const updated = [...commands];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setCommands(updated);
+    saveConfig(host, port, user, keyContent, updated);
+  };
+
+  async function handleDeploy() {
+    if (!host || !user || !keyContent) {
+      alert("Please complete Host, User, and SSH Key details.");
+      return;
+    }
+    if (commands.length === 0) {
+      alert("Please specify at least one command in the deployment script.");
+      return;
+    }
+
+    setConsoleOut("Initiating secure deployment tunnel...\nChecking key file mapping on host...\n");
+    
+    await run("Remote Git Deployment", async () => {
+      try {
+        const result = await invoke<string>("run_ssh_deployment", {
+          req: {
+            host,
+            port,
+            user,
+            keyContent,
+            commands
+          }
+        });
+        setConsoleOut(prev => prev + result + "\n");
+      } catch (err) {
+        setConsoleOut(prev => prev + `Deployment failed:\n${err}\n`);
+        throw err;
+      }
+    });
+  }
+
+  return (
+    <div className="grid two">
+      <section className="panel stackedForm">
+        <h2>SSH Configuration</h2>
+        <div className="formRow" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "10px" }}>
+          <label>Host (IP / Domain)
+            <input 
+              placeholder="192.168.1.100 or deploy.myserver.com" 
+              value={host} 
+              onChange={(e) => { setHost(e.target.value); saveConfig(e.target.value, port, user, keyContent, commands); }} 
+            />
+          </label>
+          <label>Port
+            <input 
+              type="number" 
+              placeholder="22" 
+              value={port} 
+              onChange={(e) => { const val = parseInt(e.target.value) || 22; setPort(val); saveConfig(host, val, user, keyContent, commands); }} 
+            />
+          </label>
+        </div>
+        <label>Username
+          <input 
+            placeholder="root, ubuntu, deploy" 
+            value={user} 
+            onChange={(e) => { setUser(e.target.value); saveConfig(host, port, e.target.value, keyContent, commands); }} 
+          />
+        </label>
+        <label>SSH Private Key (RSA / ED25519)
+          <textarea 
+            className="codeArea" 
+            rows={6}
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..." 
+            value={keyContent} 
+            onChange={(e) => { setKeyContent(e.target.value); saveConfig(host, port, user, e.target.value, commands); }}
+            style={{ fontFamily: "monospace", fontSize: "11px" }}
+          />
+        </label>
+        
+        <button 
+          className="primary" 
+          onClick={handleDeploy}
+          style={{ background: "linear-gradient(135deg, #18a999 0%, #11786d 100%)", marginTop: "15px" }}
+        >
+          <Network size={17} /> Start Remote Git Deployment
+        </button>
+      </section>
+
+      <section className="panel" style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        <div>
+          <h2>Deployment Script Sequence</h2>
+          <p className="muted" style={{ marginBottom: "10px" }}>Commands will run sequentially. If a command fails, execution stops.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "250px", overflowY: "auto", border: "1px solid rgba(132, 145, 166, 0.15)", padding: "10px", borderRadius: "5px", background: "rgba(132, 145, 166, 0.03)" }}>
+            {commands.map((cmd, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(132,145,166,0.06)", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}>
+                <span style={{ color: "var(--es-teal)", fontWeight: "bold", width: "20px" }}>{idx + 1}.</span>
+                <span style={{ fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{cmd}</span>
+                <button style={{ minHeight: "22px", padding: "0 6px", fontSize: "10px" }} onClick={() => moveCommand(idx, "up")}>▲</button>
+                <button style={{ minHeight: "22px", padding: "0 6px", fontSize: "10px" }} onClick={() => moveCommand(idx, "down")}>▼</button>
+                <button style={{ minHeight: "22px", padding: "0 6px", fontSize: "10px", background: "rgba(242,94,94,0.15)", color: "#ff7777" }} onClick={() => removeCommand(idx)}>✕</button>
+              </div>
+            ))}
+            {commands.length === 0 && <p className="muted" style={{ fontSize: "12px", textAlign: "center" }}>No commands added yet.</p>}
+          </div>
+          <div className="formRow compact" style={{ marginTop: "10px" }}>
+            <input 
+              placeholder="Add custom build command..." 
+              value={newCommand} 
+              onChange={(e) => setNewCommand(e.target.value)} 
+              onKeyDown={(e) => e.key === "Enter" && addCommand()}
+            />
+            <button className="primary" onClick={addCommand}>Add Command</button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <h2>Deployment Engine Output</h2>
+          <pre 
+            className="codeArea" 
+            style={{ 
+              flex: 1, 
+              minHeight: "180px", 
+              maxHeight: "250px", 
+              overflowY: "auto", 
+              fontSize: "11px", 
+              background: "var(--es-ink)", 
+              color: "#92d0ff", 
+              padding: "12px", 
+              borderRadius: "4px", 
+              fontFamily: "monospace", 
+              whiteSpace: "pre-wrap" 
+            }}
+          >
+            {consoleOut || "Waiting to trigger deployment..."}
+          </pre>
+          <button style={{ alignSelf: "flex-end", marginTop: "5px", minHeight: "26px", fontSize: "11px" }} onClick={() => setConsoleOut("")}>Clear Console</button>
+        </div>
+      </section>
     </div>
   );
 }

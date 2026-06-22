@@ -95,9 +95,9 @@ graph TD
 - [x] WordPress, Laravel, and React project installers (with auto-config).
 - [x] Local tunnel dashboard sharing widget.
 - [x] Taskbar tray quick actions context menu with website shortcuts.
-- [ ] Visual telemetry graphs showing CPU, RAM, and disk utilization history.
-- [ ] Docker container orchestration dashboard controls.
-- [ ] One-click remote server git deployment engine.
+- [x] Visual telemetry graphs showing CPU, RAM, and disk utilization history.
+- [x] Docker container orchestration dashboard controls.
+- [x] One-click remote server git deployment engine.
 
 ---
 

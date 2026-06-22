@@ -87,7 +87,12 @@ pub fn run() {
             commands::install_app_template,
             commands::is_xdebug_enabled,
             commands::install_php_version,
-            commands::get_active_php_version
+            commands::get_active_php_version,
+            commands::get_docker_images,
+            commands::run_docker_container,
+            commands::pull_docker_image,
+            commands::prune_docker_system,
+            commands::run_ssh_deployment
         ])
         .run(tauri::generate_context!())
         .expect("failed to run ElectroStack");
