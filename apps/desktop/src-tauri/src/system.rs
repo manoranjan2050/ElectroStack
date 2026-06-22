@@ -2,26 +2,50 @@ use crate::config;
 use crate::models::SystemOverview;
 use crate::services;
 use sysinfo::{Disks, System};
+use std::sync::Mutex;
+use std::sync::OnceLock;
+
+static SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
+
+fn get_system() -> &'static Mutex<System> {
+    SYSTEM.get_or_init(|| {
+        let mut sys = System::new_all();
+        sys.refresh_all();
+        Mutex::new(sys)
+    })
+}
 
 pub async fn overview() -> SystemOverview {
-    let mut system = System::new_all();
-    system.refresh_all();
     let services = services::refresh_services().await;
     let running_services = services
         .iter()
         .filter(|service| matches!(service.status, crate::models::ServiceStatus::Running))
         .count();
-    let total_memory = system.total_memory();
-    let used_memory = system.used_memory();
-    let ram_usage = if total_memory == 0 {
-        0.0
-    } else {
-        (used_memory as f32 / total_memory as f32) * 100.0
-    };
+
+    let mut ram_usage = 0.0;
+    let mut total_memory = 0;
+    let mut used_memory = 0;
+    let mut cpu_usage = 0.0;
+
+    {
+        if let Ok(mut system) = get_system().lock() {
+            system.refresh_cpu();
+            system.refresh_memory();
+            total_memory = system.total_memory();
+            used_memory = system.used_memory();
+            ram_usage = if total_memory == 0 {
+                0.0
+            } else {
+                (used_memory as f32 / total_memory as f32) * 100.0
+            };
+            cpu_usage = system.global_cpu_info().cpu_usage();
+        }
+    }
+
     let disk_usage = disk_usage_percent();
 
     SystemOverview {
-        cpu_usage: system.global_cpu_info().cpu_usage(),
+        cpu_usage,
         ram_usage,
         disk_usage,
         total_memory,

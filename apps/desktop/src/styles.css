@@ -798,3 +798,26 @@ footer a {
   background: rgba(242, 94, 94, 0.2);
   color: var(--es-danger);
 }
+
+.metric-gauge-card {
+  border: 1px solid rgba(132, 145, 166, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  min-height: 140px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease;
+}
+
+.metric-gauge-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.15);
+  border-color: var(--es-teal);
+}
+
+:root[data-theme="light"] .metric-gauge-card {
+  background: #ffffff;
+}

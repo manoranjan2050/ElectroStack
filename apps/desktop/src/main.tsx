@@ -372,17 +372,56 @@ function TelemetryGraph({ data, color }: { data: number[]; color: string }) {
   );
 }
 
+function CircularGauge({ value, label, color }: { value: number; label: string; color: string }) {
+  const radius = 30;
+  const circumference = 2 * Math.PI * radius; // ~188.49
+  const offset = circumference - (value / 100) * circumference;
+
+  return (
+    <div style={{ position: "relative", width: "76px", height: "76px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <svg width="76" height="76" viewBox="0 0 76 76" style={{ transform: "rotate(-90deg)" }}>
+        <circle
+          cx="38"
+          cy="38"
+          r={radius}
+          fill="transparent"
+          stroke="rgba(132, 145, 166, 0.08)"
+          strokeWidth="5"
+        />
+        <circle
+          cx="38"
+          cy="38"
+          r={radius}
+          fill="transparent"
+          stroke={color}
+          strokeWidth="5"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{
+            transition: "stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        />
+      </svg>
+      <div style={{ position: "absolute", fontSize: "13px", fontWeight: 700, color: "inherit" }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
 function Metric({ title, value, history, color, icon: Icon }: { title: string; value: number; history: number[]; color: string; icon: typeof Activity }) {
   return (
-    <div className="metric" style={{ height: "auto", minHeight: "170px", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-        <Icon size={20} />
-        <span>{title}</span>
-        <strong style={{ marginLeft: "auto" }}>{Math.round(value)}%</strong>
-      </div>
-      <div className="bar" style={{ margin: "8px 0" }}><i style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-        <TelemetryGraph data={history} color={color} />
+    <div className="metric-gauge-card">
+      <CircularGauge value={value} label={`${Math.round(value)}%`} color={color} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", width: "0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Icon size={18} style={{ color }} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "#8e9bb0" }}>{title}</span>
+        </div>
+        <div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}>
+          <TelemetryGraph data={history} color={color} />
+        </div>
       </div>
     </div>
   );
@@ -396,12 +435,21 @@ function Dashboard({ overview, telemetryHistory, run }: { overview: Overview | n
         <Metric title="CPU Usage" value={overview?.cpuUsage ?? 0} history={telemetryHistory.cpu} color="var(--es-teal)" icon={Activity} />
         <Metric title="RAM Usage" value={overview?.ramUsage ?? 0} history={telemetryHistory.ram} color="#3b82f6" icon={Server} />
         <Metric title="Disk Usage" value={overview?.diskUsage ?? 0} history={telemetryHistory.disk} color="#f5b141" icon={HardDrive} />
-        <div className="metric" style={{ height: "auto", minHeight: "170px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Network size={20} />
-            <span>Running Services</span>
+        <div className="metric-gauge-card">
+          <CircularGauge
+            value={services.length > 0 ? ((overview?.runningServices ?? 0) / services.length) * 100 : 0}
+            label={`${overview?.runningServices ?? 0}/${services.length}`}
+            color="#a855f7"
+          />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Network size={18} style={{ color: "#a855f7" }} />
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#8e9bb0" }}>Running Services</span>
+            </div>
+            <div style={{ fontSize: "11px", color: "#8e9bb0", marginTop: "10px", lineHeight: "1.4" }}>
+              Core database and web services are active.
+            </div>
           </div>
-          <strong style={{ fontSize: "2rem", marginTop: "1rem" }}>{overview?.runningServices ?? 0}</strong>
         </div>
       </div>
       <div className="grid two">
